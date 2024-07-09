@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bind9
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: bind9
+  labels:
+    app: dns-app
+    type: dns-master
+  name: dns-deployement
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      # Selector must match a label
+      # type: master-pod
+      app: master-app
+  template:
+    metadata:
+      labels:
+        app: master-app
+        # If app doesn't match a selector, one of the other labels has to (otherwise, the deployment is invalid)
+        type: master-pod
+    spec:
+      containers:
+      - image: ubuntu/bind9
+        name: master-container
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: bind9-slave-rc
+  namespace: bind9
+  labels:
+    app: dns-slave
+spec:
+  template:
+      metadata:
+        labels:
+          run: dns-slave
+        name: dns-slave
+        namespace: default
+      spec:
+        containers:
+        - image: ubuntu/bind9
+          name: dns-slave
+  replicas: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: bind9
+  labels:
+    app: netcmd-deployment
+  name: netcmd-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: netcmd-app
+  template:
+    metadata:
+      labels:
+        app: netcmd-app
+    spec:
+      containers:
+      - image: helgeste/netcmd
+        name: netcmd-container
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: dns-svc
+  name: dns-svc
+  namespace: bind9
+spec:
+  ports:
+  - name: dns-service
+    nodePort: 30053
+    port: 53
+    targetPort: 53
+  selector:
+    app: dns-app
+    type: dns-master
+  type: NodePort
